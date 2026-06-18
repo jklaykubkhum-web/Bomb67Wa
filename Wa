@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ตัดขวางโลก — เกมตอบคำถามโครงสร้างโลก</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --crust: #c9a36a;
+    --mantle: #b5471f;
+    --outer-core: #ff7a1a;
+    --inner-core: #ffe27a;
+    --ink: #fff5e6;
+    --ink-dim: #ffd9ad;
+    --panel: rgba(15,8,4,0.72);
+    --good: #6ee7a0;
+    --bad: #ff6b6b;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+
+  body{
+    min-height:100vh;
+    font-family:'Space Grotesk', sans-serif;
+    color:var(--ink);
+    background: radial-gradient(circle at 50% 100%, var(--inner-core) 0%, var(--outer-core) 18%, var(--mantle) 45%, #5a2410 72%, #2a1208 100%);
+    overflow-x:hidden;
+    position:relative;
+  }
+
+  /* layered earth cross-section background, fixed */
+  .earth-bg{
+    position:fixed;
+    inset:0;
+    z-index:-2;
+    background:
+      radial-gradient(circle at 50% 140%, #ffe27a 0%, #ff7a1a 18%, #c8430f 38%, #7a2b12 58%, #3c160a 78%, #1a0a05 100%);
+  }
+  .earth-bg::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      repeating-radial-gradient(circle at 50% 140%,
+        rgba(255,255,255,0.035) 0px,
+        rgba(255,255,255,0.035) 2px,
+        transparent 2px,
+        transparent 14px);
+    mix-blend-mode:overlay;
+  }
+  .core-glow{
+    position:fixed;
+    left:50%; bottom:-30vh;
+    width:70vmax; height:70vmax;
+    transform:translateX(-50%);
+    background:radial-gradient(circle, rgba(255,226,122,0.9) 0%, rgba(255,122,26,0.55) 30%, transparent 65%);
+    filter:blur(10px);
+    z-index:-1;
+    animation: pulse 5s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:0.85; transform:translateX(-50%) scale(1);}
+    50%{opacity:1; transform:translateX(-50%) scale(1.06);}
+  }
+
+  .wrap{
+    max-width:680px;
+    margin:0 auto;
+    padding:32px 20px 80px;
+    position:relative;
+    z-index:1;
+  }
+
+  header{
+    text-align:center;
+    margin-bottom:28px;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+    opacity:0.85;
+    margin-bottom:8px;
+  }
+  h1{
+    font-size:clamp(28px,7vw,42px);
+    font-weight:700;
+    margin:0 0 6px;
+    letter-spacing:-0.01em;
+    text-shadow:0 2px 20px rgba(0,0,0,0.4);
+  }
+  .sub{
+    font-size:14px;
+    color:var(--ink-dim);
+    opacity:0.9;
+  }
+
+  /* depth gauge */
+  .depth-gauge{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin:20px 0 28px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color:var(--ink-dim);
+  }
+  .depth-track{
+    flex:1;
+    height:6px;
+    border-radius:4px;
+    background:rgba(0,0,0,0.35);
+    overflow:hidden;
+    position:relative;
+  }
+  .depth-fill{
+    height:100%;
+    background:linear-gradient(90deg, var(--crust), var(--inner-core));
+    width:0%;
+    transition:width 0.5s ease;
+  }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid rgba(255,200,140,0.18);
+    border-radius:16px;
+    padding:28px 24px;
+    backdrop-filter:blur(6px);
+    box-shadow:0 20px 60px rgba(0,0,0,0.4);
+  }
+
+  .layer-tag{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    padding:5px 10px;
+    border-radius:20px;
+    background:rgba(255,255,255,0.08);
+    color:var(--ink-dim);
+    margin-bottom:16px;
+  }
+  .layer-dot{width:8px; height:8px; border-radius:50%; background:var(--inner-core);}
+
+  .question-text{
+    font-size:clamp(18px,4.2vw,22px);
+    font-weight:500;
+    line-height:1.5;
+    margin-bottom:22px;
+  }
+
+  .options{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .opt-btn{
+    text-align:left;
+    padding:14px 16px;
+    border-radius:10px;
+    border:1px solid rgba(255,200,140,0.25);
+    background:rgba(0,0,0,0.25);
+    color:var(--ink);
+    font-family:'Space Grotesk', sans-serif;
+    font-size:15px;
+    cursor:pointer;
+    transition:border-color 0.2s, background 0.2s, transform 0.1s;
+    display:flex;
+    gap:10px;
+  }
+  .opt-btn:hover:not(:disabled){
+    border-color:rgba(255,200,140,0.6);
+    background:rgba(0,0,0,0.4);
+  }
+  .opt-btn:active:not(:disabled){transform:scale(0.99);}
+  .opt-btn:disabled{cursor:default;}
+  .opt-letter{
+    font-family:'JetBrains Mono', monospace;
+    opacity:0.6;
+    flex-shrink:0;
+  }
+  .opt-btn.correct{
+    border-color:var(--good);
+    background:rgba(110,231,160,0.15);
+  }
+  .opt-btn.wrong{
+    border-color:var(--bad);
+    background:rgba(255,107,107,0.15);
+  }
+
+  .feedback{
+    margin-top:18px;
+    padding:16px 18px;
+    border-radius:10px;
+    font-size:14px;
+    line-height:1.6;
+    display:none;
+  }
+  .feedback.show{display:block; animation:fadeIn 0.3s ease;}
+  .feedback.right{background:rgba(110,231,160,0.12); border:1px solid rgba(110,231,160,0.35);}
+  .feedback.wrong{background:rgba(255,107,107,0.12); border:1px solid rgba(255,107,107,0.35);}
+  .feedback-title{
+    font-weight:700;
+    margin-bottom:4px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  @keyframes fadeIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+
+  .next-btn{
+    margin-top:18px;
+    width:100%;
+    padding:14px;
+    border-radius:10px;
+    border:none;
+    background:linear-gradient(90deg, var(--outer-core), var(--inner-core));
+    color:#1a0a05;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+    display:none;
+  }
+  .next-btn.show{display:block;}
+  .next-btn:hover{filter:brightness(1.08);}
+
+  /* results screen */
+  .result-screen{display:none; text-align:center;}
+  .result-screen.show{display:block;}
+  .score-num{
+    font-family:'JetBrains Mono', monospace;
+    font-size:64px;
+    font-weight:700;
+    line-height:1;
+    margin:6px 0;
+    text-shadow:0 0 30px rgba(255,200,120,0.6);
+  }
+  .score-label{font-size:14px; color:var(--ink-dim);}
+  .score-msg{margin:18px 0 26px; font-size:16px; line-height:1.6;}
+  .restart-btn{
+    padding:14px 28px;
+    border-radius:10px;
+    border:1px solid rgba(255,200,140,0.4);
+    background:rgba(255,255,255,0.08);
+    color:var(--ink);
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:15px;
+    cursor:pointer;
+  }
+  .restart-btn:hover{background:rgba(255,255,255,0.15);}
+
+  .quiz-screen{display:block;}
+  .quiz-screen.hide{display:none;}
+
+  footer.note{
+    text-align:center;
+    font-size:11px;
+    color:var(--ink-dim);
+    opacity:0.6;
+    margin-top:24px;
+    font-family:'JetBrains Mono', monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="earth-bg"></div>
+<div class="core-glow"></div>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">เจาะลึกถึงแกนโลก</div>
+    <h1>ตัดขวางโลก</h1>
+    <div class="sub">เกมตอบคำถามวิทยาศาสตร์ · โครงสร้างโลก 10 ข้อ</div>
+  </header>
+
+  <div class="depth-gauge">
+    <span id="depthLabel">ข้อ 1 / 10</span>
+    <div class="depth-track"><div class="depth-fill" id="depthFill"></div></div>
+    <span id="scoreLabel">ถูก 0</span>
+  </div>
+
+  <div class="quiz-screen" id="quizScreen">
+    <div class="panel">
+      <div class="layer-tag"><span class="layer-dot" id="layerDot"></span><span id="layerName">เปลือกโลก</span></div>
+      <div class="question-text" id="questionText"></div>
+      <div class="options" id="optionsBox"></div>
+      <div class="feedback" id="feedbackBox">
+        <div class="feedback-title" id="feedbackTitle"></div>
+        <div id="feedbackText"></div>
+      </div>
+      <button class="next-btn" id="nextBtn">ข้อต่อไป →</button>
+    </div>
+  </div>
+
+  <div class="result-screen" id="resultScreen">
+    <div class="panel">
+      <div class="layer-tag"><span class="layer-dot"></span>สรุปผลการเจาะโลก</div>
+      <div class="score-label">คะแนนของคุณ</div>
+      <div class="score-num" id="finalScore">0/10</div>
+      <div class="score-msg" id="scoreMsg"></div>
+      <button class="restart-btn" id="restartBtn">เจาะใหม่อีกครั้ง</button>
+    </div>
+  </div>
+
+  <footer class="note">เปลือกโลก → แมนเทิล → แกนโลกชั้นนอก → แกนโลกชั้นใน</footer>
+</div>
+
+<script>
+const layers = [
+  {name:"เปลือกโลก", color:"#c9a36a"},
+  {name:"แมนเทิล", color:"#ff7a1a"},
+  {name:"แกนโลกชั้นนอก", color:"#ffae4a"},
+  {name:"แกนโลกชั้นใน", color:"#ffe27a"}
+];
+
+const questions = [
+  {
+    layer:0,
+    q:"ชั้นที่อยู่ชั้นนอกสุดของโลก ซึ่งเป็นที่ตั้งของทวีปและพื้นมหาสมุทร เรียกว่าอะไร",
+    options:["เปลือกโลก (Crust)","แมนเทิล (Mantle)","แกนโลกชั้นนอก (Outer Core)","ลิโทสเฟียร์ (Lithosphere)"],
+    correct:0,
+    explainWrong:{
+      1:"แมนเทิลคือชั้นที่อยู่ใต้เปลือกโลกลงไป ไม่ใช่ชั้นนอกสุด เปลือกโลกต่างหากที่เป็นชั้นบางๆด้านบนที่เราอาศัยอยู่",
+      2:"แกนโลกชั้นนอกอยู่ลึกลงไปหลายพันกิโลเมตร เป็นของเหลวร้อนจัด ไม่ใช่ชั้นที่เราเดินอยู่บนนั้น",
+      3:"ลิโทสเฟียร์เป็นคำที่รวมเปลือกโลกกับส่วนบนของแมนเทิลที่แข็งเข้าด้วยกัน จึงไม่ใช่คำตอบที่ตรงที่สุดสำหรับ 'ชั้นนอกสุด' เพียงอย่างเดียว"
+    },
+    fact:"เปลือกโลกบางมากเมื่อเทียบกับทั้งโลก หนาเฉลี่ยเพียง 5-70 กิโลเมตร เหมือนเปลือกไข่ที่บางเมื่อเทียบกับทั้งฟอง"
+  },
+  {
+    layer:0,
+    q:"เปลือกโลกใต้มหาสมุทรกับเปลือกโลกที่เป็นทวีป ต่างกันอย่างไร",
+    options:[
+      "เปลือกทวีปหนากว่าและความหนาแน่นน้อยกว่าเปลือกมหาสมุทร",
+      "เปลือกมหาสมุทรหนากว่าและความหนาแน่นน้อยกว่าเปลือกทวีป",
+      "ทั้งสองชนิดมีความหนาและความหนาแน่นเท่ากันทุกประการ",
+      "เปลือกมหาสมุทรประกอบด้วยหินแกรนิตเป็นหลัก"
+    ],
+    correct:0,
+    explainWrong:{
+      1:"สลับกัน เปลือกมหาสมุทรจริงๆบางกว่าเปลือกทวีป แต่มีความหนาแน่นมากกว่า เพราะส่วนใหญ่เป็นหินบะซอลต์",
+      2:"ทั้งสองชนิดต่างกันทั้งความหนาและองค์ประกอบ เปลือกทวีปหนาประมาณ 30-70 กม. ส่วนเปลือกมหาสมุทรหนาเพียง 5-10 กม.",
+      3:"หินแกรนิตเป็นองค์ประกอบหลักของเปลือกทวีป ไม่ใช่เปลือกมหาสมุทรซึ่งเป็นหินบะซอลต์เป็นหลัก"
+    },
+    fact:"เปลือกทวีปมีความหนาแน่นน้อยกว่า จึงลอยตัวสูงกว่าเปลือกมหาสมุทรเมื่อเทียบกับชั้นแมนเทิลด้านล่าง"
+  },
+  {
+    layer:1,
+    q:"ชั้นแมนเทิลของโลกมีสถานะอย่างไร",
+    options:[
+      "เป็นของแข็งแต่ยืดหยุ่นจนไหลตัวได้ช้าๆเหมือนของหนืด",
+      "เป็นของเหลวร้อนจัดเหมือนลาวาทั้งชั้น",
+      "เป็นแก๊สร้อนความดันสูง",
+      "เป็นของแข็งแกร่งที่ไม่เคลื่อนที่เลย"
+    ],
+    correct:0,
+    explainWrong:{
+      1:"แมนเทิลส่วนใหญ่ไม่ใช่ของเหลวเหมือนลาว่า มันเป็นของแข็งที่ร้อนจัดจนยืดหยุ่นและไหลตัวได้อย่างช้ามากในระดับหลายเซนติเมตรต่อปี",
+      2:"แมนเทิลไม่ใช่แก๊ส มันคือหินแข็งหนาแน่นสูง เพียงแต่ร้อนและรับความดันมากจนเคลื่อนตัวได้เหมือนของหนืด",
+      3:"ตรงข้ามกับความจริง แมนเทิลเคลื่อนที่อยู่ตลอดเวลาแบบช้าๆ การเคลื่อนตัวนี้คือตัวขับเคลื่อนการเคลื่อนที่ของแผ่นเปลือกโลก"
+    },
+    fact:"การไหลของแมนเทิลอย่างช้าๆนี้เรียกว่า convection ซึ่งเป็นแรงขับเคลื่อนสำคัญที่ทำให้แผ่นเปลือกโลกเคลื่อนที่"
+  },
+  {
+    layer:1,
+    q:"แมนเทิลคิดเป็นสัดส่วนปริมาตรเท่าใดของโลกทั้งหมด",
+    options:["ประมาณ 84%","ประมาณ 15%","ประมาณ 50%","ประมาณ 1%"],
+    correct:0,
+    explainWrong:{
+      1:"15% ใกล้เคียงกับสัดส่วนของแกนโลกทั้งหมด (ทั้งชั้นนอกและชั้นใน) มากกว่า ไม่ใช่แมนเทิล",
+      2:"50% ยังน้อยกว่าความจริงมาก แมนเทิลเป็นชั้นที่หนาที่สุดของโลกโดยกินพื้นที่ส่วนใหญ่เกือบทั้งหมด",
+      3:"1% นั้นใกล้เคียงกับสัดส่วนของเปลือกโลกเท่านั้น แมนเทิลมีปริมาตรมากกว่านั้นมหาศาล"
+    },
+    fact:"แมนเทิลหนาประมาณ 2,900 กิโลเมตร เป็นชั้นที่หนาที่สุดของโลก ทำให้กินปริมาตรส่วนใหญ่ของทั้งดาว"
+  },
+  {
+    layer:1,
+    q:"การเคลื่อนที่แบบพาความร้อน (convection) ในแมนเทิลส่งผลต่อสิ่งใดบนพื้นผิวโลกมากที่สุด",
+    options:[
+      "การเคลื่อนที่ของแผ่นเปลือกโลก (Plate Tectonics)",
+      "การเกิดฝนตกและพายุ",
+      "การขึ้นลงของน้ำทะเล",
+      "การหมุนของโลกรอบตัวเอง"
+    ],
+    correct:0,
+    explainWrong:{
+      1:"ฝนและพายุเกิดจากกระบวนการในชั้นบรรยากาศ ไม่เกี่ยวข้องกับการพาความร้อนในแมนเทิลที่อยู่ลึกลงไปในพื้นโลก",
+      2:"น้ำขึ้นน้ำลงเกิดจากแรงดึงดูดของดวงจันทร์และดวงอาทิตย์ต่อมวลน้ำในมหาสมุทร ไม่เกี่ยวกับแมนเทิล",
+      3:"การหมุนของโลกเป็นผลจากโมเมนตัมตั้งแต่กำเนิดของระบบสุริยะ ไม่ได้เกิดจากการเคลื่อนที่ภายในแมนเทิล"
+    },
+    fact:"การพาความร้อนในแมนเทิลดันแผ่นเปลือกโลกให้เคลื่อนที่ ทำให้เกิดแผ่นดินไหว ภูเขาไฟ และการก่อตัวของทวีป"
+  },
+  {
+    layer:2,
+    q:"แกนโลกชั้นนอกประกอบด้วยธาตุใดเป็นหลัก และมีสถานะอย่างไร",
+    options:[
+      "เหล็กและนิกเกิลในสถานะของเหลว",
+      "หินบะซอลต์ในสถานะของแข็ง",
+      "เหล็กและนิกเกิลในสถานะของแข็ง",
+      "ออกซิเจนและซิลิคอนในสถานะแก๊ส"
+    ],
+    correct:0,
+    explainWrong:{
+      1:"หินบะซอลต์เป็นองค์ประกอบของเปลือกโลกใต้มหาสมุทร ไม่ใช่แกนโลกซึ่งเป็นโลหะ ไม่ใช่หิน",
+      2:"สถานะของแข็งเป็นคุณสมบัติของแกนโลกชั้นในต่างหาก แกนโลกชั้นนอกที่อยู่เหนือขึ้นมาเป็นของเหลวร้อนจัด",
+      3:"ออกซิเจนและซิลิคอนเป็นองค์ประกอบหลักของเปลือกโลกและแมนเทิล ไม่ใช่แกนโลกซึ่งเป็นโลหะหนักอย่างเหล็กและนิกเกิล"
+    },
+    fact:"การไหลของเหล็กเหลวในแกนโลกชั้นนอกคือต้นกำเนิดของสนามแม่เหล็กโลกที่ปกป้องเราจากรังสีคอสมิก"
+  },
+  {
+    layer:2,
+    q:"เหตุใดแกนโลกชั้นนอกจึงเป็นของเหลว ทั้งที่ร้อนกว่าแกนโลกชั้นในซึ่งเป็นของแข็ง",
+    options:[
+      "เพราะความดันที่แกนโลกชั้นนอกยังไม่สูงมากพอที่จะบีบให้เหล็กเป็นของแข็ง",
+      "เพราะแกนโลกชั้นนอกเย็นกว่าแกนโลกชั้นในมาก",
+      "เพราะแกนโลกชั้นนอกมีออกซิเจนผสมอยู่มากกว่า",
+      "เพราะแกนโลกชั้นนอกอยู่ใกล้เปลือกโลกซึ่งเย็นกว่า"
+    ],
+    correct:0,
+    explainWrong:{
+      1:"จริงๆแล้วแกนโลกชั้นนอกร้อนน้อยกว่าแกนโลกชั้นในเล็กน้อย แต่ความร้อนไม่ใช่ตัวกำหนดหลักว่าทำไมมันเป็นของเหลว ความดันคือกุญแจสำคัญ",
+      2:"ออกซิเจนไม่ใช่ปัจจัยหลักที่ทำให้สถานะต่างกัน ความแตกต่างของความดันที่ระดับความลึกต่างกันคือสาเหตุหลัก",
+      3:"แกนโลกชั้นนอกอยู่ลึกมาก ไม่ได้อยู่ใกล้เปลือกโลก และอุณหภูมิที่นั่นสูงนับพันองศา ไม่ได้เย็นเพราะอยู่ใกล้พื้นผิว"
+    },
+    fact:"ที่แกนโลกชั้นใน ความดันสูงมากจนเอาชนะความร้อน บีบอะตอมเหล็กให้อยู่ในสถานะของแข็งได้ทั้งที่ร้อนกว่า"
+  },
+  {
+    layer:3,
+    q:"แกนโลกชั้นในมีสถานะเป็นของแข็งเพราะเหตุใด",
+    options:[
+      "ความดันที่สูงมากเอาชนะความร้อน ทำให้เหล็กถูกบีบให้แข็งตัว",
+      "อุณหภูมิที่แกนโลกชั้นในต่ำกว่าจุดหลอมเหลวของเหล็ก",
+      "แกนโลกชั้นในไม่มีความร้อนเลย",
+      "แกนโลกชั้นในมีส่วนผสมของหินแกรนิตที่แข็งตัวง่าย"
+    ],
+    correct:0,
+    explainWrong:{
+      1:"อุณหภูมิแกนโลกชั้นในสูงกว่าจุดหลอมเหลวของเหล็กที่ความดันปกติมาก แต่ความดันมหาศาลที่นั่นต่างหากที่ทำให้มันยังคงเป็นของแข็งได้",
+      2:"แกนโลกชั้นในร้อนที่สุดในโลก คาดว่าสูงถึงประมาณ 5,000-6,000 องศาเซลเซียส ร้อนกว่าผิวดวงอาทิตย์เสียอีก",
+      3:"หินแกรนิตเป็นองค์ประกอบของเปลือกทวีป ไม่ใช่แกนโลกซึ่งเป็นโลหะเหล็กและนิกเกิลเกือบทั้งหมด"
+    },
+    fact:"แกนโลกชั้นในมีอุณหภูมิราว 5,200°C ใกล้เคียงกับพื้นผิวดวงอาทิตย์ แต่ความดันที่สูงกว่าผิวโลกหลายล้านเท่าทำให้มันยังเป็นของแข็ง"
+  },
+  {
+    layer:3,
+    q:"นักวิทยาศาสตร์ศึกษาโครงสร้างภายในของโลกที่มองไม่เห็นด้วยตาได้อย่างไรเป็นหลัก",
+    options:[
+      "วิเคราะห์คลื่นไหวสะเทือน (seismic waves) จากแผ่นดินไหว",
+      "ขุดเจาะลงไปถึงแกนโลกโดยตรง",
+      "ใช้กล้องโทรทรรศน์สำรวจใต้พื้นผิว",
+      "วัดอุณหภูมิพื้นผิวโลกเพียงอย่างเดียว"
+    ],
+    correct:0,
+    explainWrong:{
+      1:"มนุษย์ยังไม่สามารถขุดเจาะลึกได้ขนาดนั้น หลุมเจาะที่ลึกที่สุดในโลกลึกเพียงประมาณ 12 กิโลเมตร ซึ่งยังอยู่ในชั้นเปลือกโลกเท่านั้น",
+      2:"กล้องโทรทรรศน์ใช้สำรวจวัตถุในอวกาศโดยอาศัยแสง ไม่สามารถมองทะลุผ่านหินแข็งหนาหลายพันกิโลเมตรได้",
+      3:"อุณหภูมิพื้นผิวบอกได้แค่สภาพอากาศ ไม่สามารถเผยให้เห็นโครงสร้างชั้นต่างๆที่อยู่ลึกลงไปในโลกได้"
+    },
+    fact:"คลื่นไหวสะเทือนเดินทางผ่านชั้นต่างๆด้วยความเร็วและทิศทางที่เปลี่ยนไป นักวิทยาศาสตร์ใช้ข้อมูลนี้สร้างแผนที่โครงสร้างภายในโลกได้อย่างแม่นยำ"
+  },
+  {
+    layer:3,
+    q:"เรียงลำดับชั้นโลกจากผิวนอกสุดไปยังใจกลางโลกอย่างถูกต้อง",
+    options:[
+      "เปลือกโลก → แมนเทิล → แกนโลกชั้นนอก → แกนโลกชั้นใน",
+      "แมนเทิล → เปลือกโลก → แกนโลกชั้นใน → แกนโลกชั้นนอก",
+      "เปลือกโลก → แกนโลกชั้นนอก → แมนเทิล → แกนโลกชั้นใน",
+      "แกนโลกชั้นใน → แกนโลกชั้นนอก → แมนเทิล → เปลือกโลก"
+    ],
+    correct:0,
+    explainWrong:{
+      1:"สลับลำดับเปลือกโลกกับแมนเทิล เปลือกโลกอยู่นอกสุด ไม่ใช่แมนเทิล และแกนโลกชั้นในอยู่ใจกลางสุด ไม่ใช่ชั้นนอก",
+      2:"แกนโลกชั้นนอกต้องอยู่ถัดจากแมนเทิล ไม่ใช่อยู่ก่อนแมนเทิล ลำดับนี้สลับตำแหน่งของแมนเทิลกับแกนโลกชั้นนอกผิดไป",
+      3:"ลำดับนี้กลับทิศทางทั้งหมด ข้อนี้เรียงจากใจกลางโลกออกมาด้านนอก ซึ่งตรงข้ามกับที่คำถามถาม"
+    },
+    fact:"ลำดับที่ถูกต้องคือเปลือกโลก แมนเทิล แกนโลกชั้นนอก และแกนโลกชั้นใน โดยความร้อนและความดันจะเพิ่มขึ้นเรื่อยๆเมื่อลึกลงไป"
+  }
+];
+
+let current = 0;
+let score = 0;
+let answered = false;
+
+const questionText = document.getElementById('questionText');
+const optionsBox = document.getElementById('optionsBox');
+const feedbackBox = document.getElementById('feedbackBox');
+const feedbackTitle = document.getElementById('feedbackTitle');
+const feedbackText = document.getElementById('feedbackText');
+const nextBtn = document.getElementById('nextBtn');
+const depthFill = document.getElementById('depthFill');
+const depthLabel = document.getElementById('depthLabel');
+const scoreLabel = document.getElementById('scoreLabel');
+const layerName = document.getElementById('layerName');
+const layerDot = document.getElementById('layerDot');
+const quizScreen = document.getElementById('quizScreen');
+const resultScreen = document.getElementById('resultScreen');
+const finalScore = document.getElementById('finalScore');
+const scoreMsg = document.getElementById('scoreMsg');
+const restartBtn = document.getElementById('restartBtn');
+
+const letters = ['ก','ข','ค','ง'];
+
+function renderQuestion(){
+  answered = false;
+  const item = questions[current];
+  const layer = layers[item.layer];
+
+  depthLabel.textContent = `ข้อ ${current+1} / ${questions.length}`;
+  depthFill.style.width = `${((current)/questions.length)*100}%`;
+  scoreLabel.textContent = `ถูก ${score}`;
+  layerName.textContent = layer.name;
+  layerDot.style.background = layer.color;
+
+  questionText.textContent = item.q;
+  optionsBox.innerHTML = '';
+  feedbackBox.className = 'feedback';
+  feedbackBox.innerHTML = `<div class="feedback-title" id="feedbackTitle"></div><div id="feedbackText"></div>`;
+  nextBtn.classList.remove('show');
+
+  item.options.forEach((opt, idx)=>{
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.innerHTML = `<span class="opt-letter">${letters[idx]}</span><span>${opt}</span>`;
+    btn.addEventListener('click', ()=>selectAnswer(idx));
+    optionsBox.appendChild(btn);
+  });
+}
+
+function selectAnswer(idx){
+  if(answered) return;
+  answered = true;
+  const item = questions[current];
+  const buttons = optionsBox.querySelectorAll('.opt-btn');
+  buttons.forEach(b=>b.disabled = true);
+
+  const isCorrect = idx === item.correct;
+  buttons[idx].classList.add(isCorrect ? 'correct' : 'wrong');
+  if(!isCorrect){
+    buttons[item.correct].classList.add('correct');
+  }
+
+  const fb = document.getElementById('feedbackBox');
+  const ft = document.getElementById('feedbackTitle');
+  const ftext = document.getElementById('feedbackText');
+
+  if(isCorrect){
+    score++;
+    fb.classList.add('show','right');
+    ft.textContent = '✓ ถูกต้อง';
+    ftext.textContent = item.fact;
+  } else {
+    fb.classList.add('show','wrong');
+    ft.textContent = '✗ ไม่ถูกต้อง';
+    ftext.textContent = item.explainWrong[idx] || 'คำตอบนี้ไม่ตรงกับหลักความจริงทางวิทยาศาสตร์';
+  }
+
+  scoreLabel.textContent = `ถูก ${score}`;
+  nextBtn.classList.add('show');
+  nextBtn.textContent = current === questions.length-1 ? 'ดูผลลัพธ์ →' : 'ข้อต่อไป →';
+}
+
+nextBtn.addEventListener('click', ()=>{
+  current++;
+  if(current >= questions.length){
+    showResult();
+  } else {
+    renderQuestion();
+  }
+});
+
+function showResult(){
+  quizScreen.classList.add('hide');
+  resultScreen.classList.add('show');
+  depthFill.style.width = '100%';
+  depthLabel.textContent = `ข้อ ${questions.length} / ${questions.length}`;
+
+  finalScore.textContent = `${score}/${questions.length}`;
+  let msg = '';
+  if(score === questions.length){
+    msg = 'เจาะทะลุถึงใจกลางโลกได้สมบูรณ์แบบ! คุณเข้าใจโครงสร้างโลกทุกชั้นอย่างแท้จริง';
+  } else if(score >= 7){
+    msg = 'ผ่านชั้นแมนเทิลและแกนโลกได้อย่างมั่นใจ ความเข้าใจของคุณแน่นมาก';
+  } else if(score >= 4){
+    msg = 'ผ่านเปลือกโลกได้สบาย แต่บางชั้นลึกๆยังต้องทำความเข้าใจเพิ่ม ลองอ่านคำอธิบายอีกครั้งดูนะ';
+  } else {
+    msg = 'การเจาะโลกยังติดอยู่แถวพื้นผิว ลองทบทวนคำอธิบายแล้วเจาะใหม่อีกครั้ง';
+  }
+  scoreMsg.textContent = msg;
+}
+
+restartBtn.addEventListener('click', ()=>{
+  current = 0;
+  score = 0;
+  resultScreen.classList.remove('show');
+  quizScreen.classList.remove('hide');
+  renderQuestion();
+});
+
+renderQuestion();
+</script>
+
+</body>
+</html>
